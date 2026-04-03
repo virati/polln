@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pollen Season — US City Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #F5F2EC;
+      --surface:  #EDEAE2;
+      --card:     #FAFAF7;
+      --border:   rgba(60,55,40,0.12);
+      --text:     #2A2820;
+      --muted:    #7A7668;
+      --faint:    #B0ADA3;
+      --green:    #3B6D11;
+      --green-bg: rgba(59,109,17,0.08);
+      --blue:     #185FA5;
+      --blue-bg:  rgba(24,95,165,0.08);
+      --amber:    #BA7517;
+      --amber-bg: rgba(186,117,23,0.08);
+      --accent:   #4A7C1F;
+      --radius:   10px;
+    }
+    html { font-size: 16px; scroll-behavior: smooth; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+
+    header { padding: 2.5rem 2rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    .header-left h1 { font-family: 'Playfair Display', serif; font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
+    .header-left h1 em { font-style: italic; color: var(--accent); }
+    .header-left p { margin-top: 0.4rem; font-size: 0.875rem; font-weight: 300; color: var(--muted); }
+    .header-badge { font-size: 0.7rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); background: var(--green-bg); border: 1px solid rgba(59,109,17,0.2); border-radius: 20px; padding: 4px 12px; white-space: nowrap; }
+
+    main { flex: 1; max-width: 960px; width: 100%; margin: 0 auto; padding: 2rem 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+
+    .section-label { font-size: 0.68rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); margin-bottom: 0.6rem; }
+
+    .city-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+    .city-btn { font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 400; padding: 5px 14px; border: 1px solid var(--border); border-radius: 20px; background: var(--card); color: var(--muted); cursor: pointer; transition: all 0.15s ease; outline: none; }
+    .city-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--green-bg); }
+    .city-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 500; }
+
+    .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
+    .chart-header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.2rem; }
+    .city-title { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 600; }
+    .region-tag { font-size: 0.75rem; color: var(--muted); margin-left: 0.5rem; }
+    .legend { display: flex; gap: 16px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.78rem; color: var(--muted); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+    .chart-wrap { position: relative; width: 100%; height: 300px; }
+
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+    .info-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.2rem; }
+    .info-card-label { font-size: 0.68rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); margin-bottom: 0.3rem; }
+    .info-card-value { font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 600; }
+    .info-card-sub { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; font-weight: 300; }
+
+    .species-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.2rem; }
+    .species-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 0.6rem; }
+    .species-row:last-of-type { margin-bottom: 0; }
+    .species-type { font-size: 0.68rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; padding: 2px 8px; border-radius: 10px; white-space: nowrap; margin-top: 1px; }
+    .species-type.tree  { background: var(--green-bg); color: var(--green); }
+    .species-type.grass { background: var(--blue-bg);  color: var(--blue); }
+    .species-type.weed  { background: var(--amber-bg); color: var(--amber); }
+    .species-list { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+    .species-note { font-size: 0.75rem; color: var(--faint); font-style: italic; }
+
+    .section-divider { display: flex; align-items: center; gap: 12px; color: var(--faint); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; }
+    .section-divider::before, .section-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    .advisor-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .advisor-header { padding: 1rem 1.2rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .advisor-header-left { display: flex; align-items: center; gap: 10px; }
+    .advisor-icon { width: 32px; height: 32px; background: var(--green-bg); border: 1px solid rgba(59,109,17,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+    .advisor-title { font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 600; }
+    .advisor-subtitle { font-size: 0.75rem; color: var(--muted); font-weight: 300; }
+    .advisor-badge { font-size: 0.65rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); background: var(--green-bg); border: 1px solid rgba(59,109,17,0.2); border-radius: 20px; padding: 3px 10px; }
+
+    .chat-messages { padding: 1rem 1.2rem; display: flex; flex-direction: column; gap: 0.8rem; min-height: 80px; max-height: 520px; overflow-y: auto; }
+    .msg { display: flex; gap: 10px; align-items: flex-start; animation: fadeIn 0.25s ease; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+    .msg.user { flex-direction: row-reverse; }
+    .msg-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; margin-top: 2px; }
+    .msg.user .msg-avatar { background: var(--accent); color: #fff; font-weight: 500; font-size: 10px; }
+    .msg.ai   .msg-avatar { background: var(--green-bg); color: var(--green); border: 1px solid rgba(59,109,17,0.2); }
+    .msg-bubble { max-width: 82%; padding: 0.6rem 0.9rem; border-radius: 12px; font-size: 0.86rem; line-height: 1.65; }
+    .msg.user .msg-bubble { background: var(--accent); color: #fff; border-bottom-right-radius: 3px; }
+    .msg.ai   .msg-bubble { background: var(--surface); color: var(--text); border-bottom-left-radius: 3px; }
+    .msg.ai .msg-bubble strong { color: var(--text); font-weight: 500; }
+
+    .typing-dots { display: flex; gap: 4px; padding: 4px 0; }
+    .typing-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); animation: bounce 1.2s infinite ease-in-out; }
+    .typing-dots span:nth-child(2) { animation-delay: .2s; }
+    .typing-dots span:nth-child(3) { animation-delay: .4s; }
+    @keyframes bounce { 0%,80%,100%{transform:scale(0.7);opacity:.5;} 40%{transform:scale(1);opacity:1;} }
+
+    .prompt-chips { padding: 0 1.2rem 0.8rem; display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { font-family: 'DM Sans', sans-serif; font-size: 0.76rem; padding: 5px 12px; border: 1px solid var(--border); border-radius: 20px; background: var(--bg); color: var(--muted); cursor: pointer; transition: all 0.15s; line-height: 1.3; }
+    .chip:hover { border-color: var(--accent); color: var(--accent); background: var(--green-bg); }
+
+    .chat-input-row { padding: 0.8rem 1.2rem; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: flex-end; }
+    .chat-input { flex: 1; font-family: 'DM Sans', sans-serif; font-size: 0.875rem; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); resize: none; outline: none; min-height: 40px; max-height: 120px; transition: border-color .15s; line-height: 1.5; }
+    .chat-input:focus { border-color: var(--accent); }
+    .chat-input::placeholder { color: var(--faint); }
+    .send-btn { width: 40px; height: 40px; background: var(--accent); border: none; border-radius: 8px; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: opacity .15s, transform .1s; flex-shrink: 0; }
+    .send-btn:hover { opacity: .88; }
+    .send-btn:active { transform: scale(.95); }
+    .send-btn:disabled { opacity: .4; cursor: not-allowed; }
+    .send-btn svg { width: 16px; height: 16px; }
+
+    footer { text-align: center; padding: 1.2rem 1rem 2rem; font-size: 0.72rem; color: var(--faint); border-top: 1px solid var(--border); line-height: 1.7; }
+    footer a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+
+    @media (max-width: 600px) {
+      header { padding: 1.5rem 1rem 1rem; }
+      main { padding: 1.2rem 1rem; }
+      .chart-wrap { height: 240px; }
+      .msg-bubble { max-width: 90%; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Pollen <em>Season</em></h1>
+    <p>Monthly allergy forecast &amp; AI advisor — 12 US cities</p>
+  </div>
+  <span class="header-badge">AI-Powered</span>
+</header>
+
+<main>
+  <div>
+    <p class="section-label">Select a city</p>
+    <div class="city-grid" id="cityGrid"></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <span class="city-title" id="cityTitle">New York</span>
+        <span class="region-tag" id="regionTag">Northeast</span>
+      </div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot" style="background:#3B6D11"></span>Trees</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#185FA5"></span>Grass</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#BA7517"></span>Weeds</span>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="pollenChart"></canvas></div>
+  </div>
+
+  <div class="info-grid" id="infoGrid"></div>
+
+  <div class="species-card" id="speciesCard"></div>
+
+  <div class="section-divider">Allergy Advisor</div>
+
+  <div class="advisor-card">
+    <div class="advisor-header">
+      <div class="advisor-header-left">
+        <div class="advisor-icon">🌿</div>
+        <div>
+          <div class="advisor-title">Pollen Advisor</div>
+          <div class="advisor-subtitle">Cities, species, cross-reactivity &amp; travel timing</div>
+        </div>
+      </div>
+      <span class="advisor-badge">Powered by Claude</span>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="msg ai">
+        <div class="msg-avatar">🌿</div>
+        <div class="msg-bubble">
+          Hi! I can help you understand your allergy profile across US cities — including which tree species dominate each region, how pollen types cross-react (like birch ↔ alder ↔ OAS foods), optimal travel timing, and which cities to avoid based on your sensitivities. Try a prompt below or ask your own.
+        </div>
+      </div>
+    </div>
+
+    <div class="prompt-chips" id="promptChips">
+      <button class="chip" onclick="sendChip(this)">I had terrible allergies in Boston this spring — which cities should I avoid?</button>
+      <button class="chip" onclick="sendChip(this)">Does Seattle pollen cross-react with what I experience in Chicago?</button>
+      <button class="chip" onclick="sendChip(this)">What's the best US city to live in with severe tree allergies?</button>
+      <button class="chip" onclick="sendChip(this)">I'm allergic to birch — which foods might also trigger me?</button>
+      <button class="chip" onclick="sendChip(this)">Compare Dallas "cedar fever" to the Northeast tree pollen season</button>
+      <button class="chip" onclick="sendChip(this)">I'm moving from NYC to Phoenix — will my allergies get better or worse?</button>
+    </div>
+
+    <div class="chat-input-row">
+      <textarea class="chat-input" id="chatInput" placeholder="Ask about your allergies, travel plans, species, cross-reactivity…" rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </div>
+  </div>
+</main>
+
+<footer>
+  Seasonal data from NAB pollen calendars, Kleenex regional guides &amp; Allermi research.
+  AI responses are informational only — consult an allergist for medical decisions.<br/>
+  <a href="https://www.zyrtec.com/allergy-guide/understanding-allergies/types/pollen-by-season" target="_blank">Zyrtec source</a> ·
+  <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6934246/" target="_blank">NAB research (PMC)</a> ·
+  <a href="https://acaai.org/allergies/allergic-conditions/food/pollen-food-allergy-syndrome/" target="_blank">ACAAI — OAS guide</a>
+</footer>
+
+<script>
+const SEVERITY = {1:'Low',2:'Mild',3:'Moderate',4:'High',5:'Very High'};
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const cities = {
+  "New York": {
+    region:"Northeast",
+    trees: [1,2,3,5,4,2,1,1,1,1,1,1],
+    grass: [1,1,1,2,3,4,3,2,1,1,1,1],
+    weeds: [1,1,1,1,1,2,3,4,5,4,2,1],
+    species:{
+      trees:"Oak, Birch, Maple, Ash, Plane tree (peak Apr)",
+      grass:"Ryegrass, Timothy, Kentucky Bluegrass (Jun peak)",
+      weeds:"Ragweed (heavy Sep), Mugwort, Plantain",
+      notes:"Birch peaks mid-April; Ragweed dominates Sep–Oct. Classic Northeast relay across three seasons."
+    }
+  },
+  "Boston": {
+    region:"Northeast",
+    trees: [1,1,2,4,5,3,2,1,1,1,1,1],
+    grass: [1,1,1,1,2,4,4,2,1,1,1,1],
+    weeds: [1,1,1,1,1,1,2,3,5,4,2,1],
+    species:{
+      trees:"Birch (very heavy, peak May), Oak, Maple, Alder, Beech",
+      grass:"Timothy, Ryegrass, Bluegrass (Jun–Jul)",
+      weeds:"Ragweed (Sep peak), Mugwort, Lamb's quarters",
+      notes:"One of the highest birch pollen loads in the US. Bet v 1 sensitisation is common here, carrying significant OAS risk with stone fruits, apples, hazelnuts, and carrots."
+    }
+  },
+  "Chicago": {
+    region:"Midwest",
+    trees: [1,1,2,4,5,3,2,1,1,1,1,1],
+    grass: [1,1,1,1,3,5,4,2,1,1,1,1],
+    weeds: [1,1,1,1,1,2,3,4,5,4,2,1],
+    species:{
+      trees:"Elm, Maple, Oak, Ash, Birch, Box Elder (Apr–May)",
+      grass:"Timothy, Bluegrass, Ryegrass (Jun very high)",
+      weeds:"Ragweed (dominant Sep), Pigweed, Lamb's quarters",
+      notes:"Open agricultural surroundings amplify grass pollen vs NYC. Ragweed season can push into October."
+    }
+  },
+  "Minneapolis": {
+    region:"Midwest",
+    trees: [1,1,1,3,5,4,2,1,1,1,1,1],
+    grass: [1,1,1,1,2,4,5,3,1,1,1,1],
+    weeds: [1,1,1,1,1,1,2,4,5,3,1,1],
+    species:{
+      trees:"Birch (extremely high — among highest in the US), Elm, Oak, Cottonwood, Maple",
+      grass:"Timothy, Bluegrass, Ryegrass (Jul peak)",
+      weeds:"Ragweed (Sep, very dense), Pigweed, Amaranth",
+      notes:"Highest birch pollen counts in the continental US. Bet v 1 / OAS risk is very high. If you react in Boston, Minneapolis will likely be worse."
+    }
+  },
+  "Atlanta": {
+    region:"Southeast",
+    trees: [1,2,4,5,3,2,1,1,1,1,1,1],
+    grass: [1,1,2,3,4,5,4,3,2,1,1,1],
+    weeds: [1,1,1,2,2,2,3,4,5,4,2,1],
+    species:{
+      trees:"Oak (dominant, very heavy Mar–Apr), Sweet Gum, Mulberry, Cedar, Pecan",
+      grass:"Bermuda grass (dominant Jun–Jul), Bahia grass, Johnson grass",
+      weeds:"Ragweed (Sep peak), Pigweed, Dock, Plantain",
+      notes:"Famous for 'yellow snow' oak pollen in Mar–Apr. Bermuda grass season is longer than northern cities. Northerners moving here may develop new Bermuda sensitisation."
+    }
+  },
+  "Miami": {
+    region:"Southeast",
+    trees: [3,4,4,3,2,2,1,1,1,2,2,3],
+    grass: [2,2,3,3,4,4,3,3,3,2,2,2],
+    weeds: [1,1,1,2,2,3,3,3,4,3,2,1],
+    species:{
+      trees:"Australian Pine (invasive, Feb–Mar), Melaleuca, Casuarina, Brazilian Pepper",
+      grass:"Bermuda, Bahia, St. Augustine (year-round mild–moderate)",
+      weeds:"Ragweed (lighter than North), Pigweed, Dock",
+      notes:"Subtropical climate means no true off-season. Exotic invasive species create unusual sensitisation profiles not matched by standard allergy panels."
+    }
+  },
+  "Dallas": {
+    region:"South Central",
+    trees: [4,3,3,4,3,2,1,1,1,1,2,4],
+    grass: [1,1,2,3,4,4,3,3,2,1,1,1],
+    weeds: [1,1,1,1,2,2,3,4,5,4,3,1],
+    species:{
+      trees:"Ashe Juniper / Mountain Cedar (Jan & Dec — Cedar Fever), Oak, Elm, Ash, Pecan",
+      grass:"Bermuda, Johnson grass, Bahia (May–Aug)",
+      weeds:"Ragweed (Sep heaviest), Pigweed, Kochia, Russian thistle",
+      notes:"Cedar Fever (Ashe Juniper) in Jan–Feb is unique to South/Central TX — Jun a 1 is an extremely potent allergen. People new to TX are often blindsided by December-January symptoms."
+    }
+  },
+  "Houston": {
+    region:"South Central",
+    trees: [2,3,4,4,3,2,1,1,1,1,1,2],
+    grass: [1,1,2,3,4,4,4,3,2,1,1,1],
+    weeds: [1,1,1,2,2,3,4,4,5,4,2,1],
+    species:{
+      trees:"Oak, Mountain Cedar, Pecan (major regional allergen), Elm, Ash",
+      grass:"Bermuda, Johnson, Bahia (long season Mar–Sep)",
+      weeds:"Ragweed (Sep–Oct), Pigweed, Amaranth, Dock",
+      notes:"Pecan is a significant allergen unique to South TX/OK and not well-represented on standard allergy panels. Worth testing separately if you react here."
+    }
+  },
+  "Denver": {
+    region:"Mountain",
+    trees: [1,1,2,4,5,3,2,1,1,1,1,1],
+    grass: [1,1,1,2,4,5,4,2,1,1,1,1],
+    weeds: [1,1,1,1,1,2,3,4,4,3,2,1],
+    species:{
+      trees:"Cottonwood (visible May fluff — moderate allergenicity), Elm, Oak, Ash, Box Elder",
+      grass:"Bluegrass, Ryegrass, Timothy (Jun–Jul very high)",
+      weeds:"Sagebrush/Artemisia (unique to Mountain West), Kochia, Ragweed",
+      notes:"Sagebrush (Artemisia) is a major weed allergen east-coasters don't encounter. It cross-reacts partially with Mugwort and Ragweed. Cottonwood's fluffy seeds look alarming but actual allergen load is moderate."
+    }
+  },
+  "Phoenix": {
+    region:"Southwest",
+    trees: [2,3,4,4,3,2,1,1,1,1,1,2],
+    grass: [1,1,2,3,3,2,2,3,2,1,1,1],
+    weeds: [1,1,1,1,2,2,3,4,4,3,2,1],
+    species:{
+      trees:"Olive (widely planted, Oleaceae — major allergen Mar–Apr), Mulberry, Cypress, Ash, Palo Verde",
+      grass:"Bermuda (long season), Buffelgrass (invasive desert grass, fire risk)",
+      weeds:"Ragweed, Pigweed/Amaranth, Careless weed, Saltbush",
+      notes:"Olive allergy (Ole e 1) cross-reacts strongly with Ash and Lilac — all Oleaceae family. This is a different allergen network than northeastern birch/oak. Moving here from NYC means encountering new sensitisers."
+    }
+  },
+  "Los Angeles": {
+    region:"West Coast",
+    trees: [2,3,4,4,3,2,2,1,1,1,1,2],
+    grass: [1,1,2,3,4,3,3,2,2,1,1,1],
+    weeds: [1,1,1,1,2,2,2,3,4,3,2,1],
+    species:{
+      trees:"Olive, Cypress, Acacia, Eucalyptus, Mulberry, Liquidambar (Mar–Apr peak)",
+      grass:"Bermuda, Ryegrass, Fescue (mild year-round, Apr–May peak)",
+      weeds:"Mugwort/Artemisia, Ragweed (lighter), Dock, Sagebrush inland areas",
+      notes:"Olive allergy dominates — cross-reacts with Ash, Lilac, Privet (Oleaceae). Eucalyptus volume is high but allergenicity relatively low. Mediterranean climate extends mild exposure across much of the year."
+    }
+  },
+  "Seattle": {
+    region:"Pacific NW",
+    trees: [2,4,5,5,3,2,1,1,1,1,1,1],
+    grass: [1,1,1,2,3,3,2,1,1,1,1,1],
+    weeds: [1,1,1,1,1,1,2,2,2,1,1,1],
+    species:{
+      trees:"Alder (dominant, Feb–Apr — ~37% of all pollen), Douglas Fir, Western Red Cedar, Birch, Hazel",
+      grass:"Ryegrass, Velvet grass, Orchardgrass (May–Jun mild)",
+      weeds:"Negligible — weed season barely registers in PNW climate",
+      notes:"Alder (Alnus) and Birch are both Betulaceae — alder cross-reacts fully with birch via Aln g1/Bet v1 homology. OAS risk for stone fruits and hazelnuts applies equally. After July, Seattle is remarkably low-pollen."
+    }
+  }
+};
+
+const SYSTEM_PROMPT = `You are an expert allergy advisor specialising in aerobiology and US regional pollen patterns. You help users understand their allergy risk across cities, cross-reactivity between pollen types, and practical travel or relocation advice.
+
+## City Pollen Data (severity 1=Low 2=Mild 3=Moderate 4=High 5=Very High, months Jan–Dec)
+${Object.entries(cities).map(([name, d]) => `
+### ${name} (${d.region})
+Trees:  [${d.trees.join(',')}]  Grass: [${d.grass.join(',')}]  Weeds: [${d.weeds.join(',')}]
+Dominant tree species: ${d.species.trees}
+Dominant grass species: ${d.species.grass}
+Dominant weed species: ${d.species.weeds}
+Notes: ${d.species.notes}`).join('\n')}
+
+## Cross-Reactivity Networks
+
+### Betulaceae (STRONG — Bet v 1 / Aln g 1 homologs)
+Birch ↔ Alder ↔ Hazel ↔ Hornbeam — all fully cross-react at IgE level.
+Cities: Boston & Minneapolis (highest birch), Seattle (alder-dominant but functionally = birch), Chicago & New York (moderate birch).
+OAS foods triggered: apple, pear, peach, cherry, plum, hazelnut, almond, carrot, celery, kiwi, potato, strawberry, soy. Up to 90% of birch-allergic patients have OAS.
+
+### Cupressaceae / Juniperus (STRONG — Jun a 1)
+Mountain Cedar (Ashe Juniper) ↔ Red Cedar ↔ Cypress ↔ Japanese Cedar.
+Dallas/Houston Cedar Fever (Jan–Feb) ↔ partial cross with LA/Phoenix cypress and Seattle western red cedar.
+
+### Fagaceae (MODERATE cross-reactivity with Betulaceae)
+Oak ↔ Beech ↔ Chestnut — share Bet v 1 homologs with Birch.
+Heavy in Atlanta, Houston, New York.
+
+### Oleaceae (STRONG — Ole e 1)
+Olive ↔ Ash ↔ Lilac ↔ Privet ↔ Forsythia.
+Dominant in Phoenix and Los Angeles. Distinct from Northeast birch network — different sensitisation profile.
+
+### Poaceae / Grass (BROAD cross-reactivity across all species)
+Timothy ↔ Bermuda ↔ Ryegrass ↔ Bahia ↔ Bluegrass — all cross-react. If allergic to northern grasses, you will react to southern ones.
+OAS foods: melon, tomato, orange, peach, celery.
+
+### Asteraceae / Ragweed-Mugwort-Sagebrush (MODERATE)
+Ragweed ↔ Mugwort (partial) ↔ Sagebrush/Artemisia (Denver/Mountain West).
+OAS foods: banana, watermelon, honeydew, cantaloupe, cucumber, zucchini, sunflower seeds.
+
+## Key Insights by City
+- Boston/Minneapolis: Highest birch in US → severe OAS risk, cross-reacts with Seattle alder
+- Seattle: Alder = functional birch equivalent. Almost no symptoms after July.
+- Dallas: Cedar Fever (Jan/Dec) is unique and extremely potent — surprises newcomers
+- Miami: No off-season; exotic invasives not on standard panels
+- Phoenix/LA: Oleaceae (olive/ash) network — different from Northeast; relocating here may mean new sensitisations
+- Denver: Sagebrush is a unique allergen east-coasters won't have been exposed to
+- Atlanta: Oak is dominant; longer Bermuda grass season can create new grass sensitisation
+- Houston: Pecan is a regionally-specific allergen worth dedicated testing
+
+## Response style
+Be specific and practical. Use city and species names. Note cross-reactivity connections — they're often the most clinically relevant insight. Mention OAS when birch/alder/grass/ragweed are involved. Use **bold** for key species and city names. Keep responses focused and conversational, not overly long. Always recommend seeing an allergist for immunotherapy or formal testing decisions.`;
+
+let currentCity = 'New York';
+const chart = new Chart(document.getElementById('pollenChart'), {
+  type: 'line',
+  data: {
+    labels: MONTHS,
+    datasets: [
+      {label:'Trees', data:[], borderColor:'#3B6D11', backgroundColor:'rgba(59,109,17,0.07)', pointBackgroundColor:'#3B6D11', tension:0.4, fill:false, pointRadius:5, pointHoverRadius:7, borderWidth:2.5},
+      {label:'Grass', data:[], borderColor:'#185FA5', backgroundColor:'rgba(24,95,165,0.07)', pointBackgroundColor:'#185FA5', tension:0.4, fill:false, pointRadius:5, pointHoverRadius:7, borderWidth:2.5},
+      {label:'Weeds', data:[], borderColor:'#BA7517', backgroundColor:'rgba(186,117,23,0.07)', pointBackgroundColor:'#BA7517', tension:0.4, fill:false, pointRadius:5, pointHoverRadius:7, borderWidth:2.5},
+    ]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    animation:{duration:350, easing:'easeInOutQuart'},
+    plugins:{
+      legend:{display:false},
+      tooltip:{backgroundColor:'#FAFAF7', titleColor:'#2A2820', bodyColor:'#7A7668', borderColor:'rgba(60,55,40,0.15)', borderWidth:1, padding:10,
+        callbacks:{label:ctx=>`  ${ctx.dataset.label}: ${SEVERITY[ctx.parsed.y]}`}}
+    },
+    scales:{
+      y:{min:0.5,max:5.5, ticks:{stepSize:1,callback:v=>SEVERITY[v]||'',font:{size:11},color:'#B0ADA3'}, grid:{color:'rgba(60,55,40,0.06)'}, border:{display:false}},
+      x:{ticks:{autoSkip:false,font:{size:11},color:'#B0ADA3'}, grid:{color:'rgba(60,55,40,0.04)'}, border:{display:false}}
+    }
+  }
+});
+
+function peakMonth(arr){const max=Math.max(...arr);return `${MONTHS[arr.indexOf(max)]} — ${SEVERITY[max]}`;}
+function worstMonths(t,g,w){return MONTHS.map((_,i)=>({m:MONTHS[i],v:t[i]+g[i]+w[i]})).sort((a,b)=>b.v-a.v).slice(0,2).map(x=>x.m).join(' & ');}
+
+function renderInfoCards(name){
+  const d=cities[name];
+  document.getElementById('infoGrid').innerHTML=[
+    {label:'Tree pollen peak',  value:peakMonth(d.trees),  sub:'highest severity month'},
+    {label:'Grass pollen peak', value:peakMonth(d.grass),  sub:'highest severity month'},
+    {label:'Weed pollen peak',  value:peakMonth(d.weeds),  sub:'highest severity month'},
+    {label:'Worst overall',     value:worstMonths(d.trees,d.grass,d.weeds), sub:'combined allergen load'},
+  ].map(i=>`<div class="info-card"><div class="info-card-label">${i.label}</div><div class="info-card-value">${i.value}</div><div class="info-card-sub">${i.sub}</div></div>`).join('');
+}
+
+function renderSpecies(name){
+  const s=cities[name].species;
+  document.getElementById('speciesCard').innerHTML=`
+    <p class="section-label" style="margin-bottom:.7rem">Dominant species — ${name}</p>
+    <div class="species-row"><span class="species-type tree">Trees</span><div class="species-list">${s.trees}</div></div>
+    <div class="species-row"><span class="species-type grass">Grass</span><div class="species-list">${s.grass}</div></div>
+    <div class="species-row"><span class="species-type weed">Weeds</span><div class="species-list">${s.weeds}</div></div>
+    <div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--border)"><span class="species-note">${s.notes}</span></div>`;
+}
+
+function switchCity(name){
+  currentCity=name;
+  const d=cities[name];
+  chart.data.datasets[0].data=d.trees;
+  chart.data.datasets[1].data=d.grass;
+  chart.data.datasets[2].data=d.weeds;
+  chart.update();
+  document.getElementById('cityTitle').textContent=name;
+  document.getElementById('regionTag').textContent=d.region;
+  document.querySelectorAll('.city-btn').forEach(b=>b.classList.toggle('active',b.textContent===name));
+  renderInfoCards(name);
+  renderSpecies(name);
+}
+
+const grid=document.getElementById('cityGrid');
+Object.keys(cities).forEach(name=>{
+  const btn=document.createElement('button');
+  btn.className='city-btn'+(name===currentCity?' active':'');
+  btn.textContent=name;
+  btn.onclick=()=>switchCity(name);
+  grid.appendChild(btn);
+});
+switchCity('New York');
+
+// ── AI Chat ──
+const chatHistory=[];
+let isLoading=false;
+
+function appendMessage(role,html){
+  const msgs=document.getElementById('chatMessages');
+  const div=document.createElement('div');
+  div.className=`msg ${role==='user'?'user':'ai'}`;
+  const av=document.createElement('div'); av.className='msg-avatar'; av.textContent=role==='user'?'You':'🌿';
+  const bub=document.createElement('div'); bub.className='msg-bubble'; bub.innerHTML=html;
+  div.appendChild(av); div.appendChild(bub);
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+  return bub;
+}
+
+function showTyping(){
+  const msgs=document.getElementById('chatMessages');
+  const div=document.createElement('div');
+  div.className='msg ai'; div.id='typingIndicator';
+  div.innerHTML='<div class="msg-avatar">🌿</div><div class="msg-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
+  msgs.appendChild(div); msgs.scrollTop=msgs.scrollHeight;
+}
+function removeTyping(){const el=document.getElementById('typingIndicator');if(el)el.remove();}
+
+function formatAI(text){
+  return text
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/\n\n/g,'<br><br>')
+    .replace(/\n/g,'<br>');
+}
+
+async function sendMessage(){
+  const input=document.getElementById('chatInput');
+  const text=input.value.trim();
+  if(!text||isLoading)return;
+  input.value=''; input.style.height='auto';
+  isLoading=true; document.getElementById('sendBtn').disabled=true;
+  document.getElementById('promptChips').style.display='none';
+  appendMessage('user',text);
+  chatHistory.push({role:'user',content:text});
+  showTyping();
+  try{
+    const res=await fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({system:SYSTEM_PROMPT,messages:chatHistory})
+    });
+    const data=await res.json();
+    const reply=data.content?.find(b=>b.type==='text')?.text||'Sorry, no response received.';
+    removeTyping();
+    appendMessage('ai',formatAI(reply));
+    chatHistory.push({role:'assistant',content:reply});
+  }catch(e){
+    removeTyping();
+    appendMessage('ai','There was a connection error. Please try again.');
+  }
+  isLoading=false; document.getElementById('sendBtn').disabled=false;
+  document.getElementById('chatInput').focus();
+}
+
+function sendChip(el){
+  document.getElementById('chatInput').value=el.textContent;
+  sendMessage();
+}
+</script>
+</body>
+</html>
